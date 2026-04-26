@@ -1,8 +1,12 @@
-import { configure } from 'mobx';
+import { configure, makeAutoObservable } from 'mobx';
 
 let isMobxConfigured = false;
 
-export class RootStore {}
+export class RootStore {
+  constructor() {
+    makeAutoObservable(this, {}, { autoBind: true });
+  }
+}
 
 export function configureMobx(): void {
   if (isMobxConfigured) {
