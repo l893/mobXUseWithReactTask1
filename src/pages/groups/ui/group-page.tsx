@@ -1,49 +1,38 @@
-import React, { useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { Col, Row } from 'react-bootstrap';
 import { useParams } from 'react-router-dom';
-import { GroupContactsCard, type GroupContactsDto } from '@entities/group';
+import { observer } from 'mobx-react-lite';
+import { useRootStore } from '@app/store';
+import { GroupContactsCard } from '@entities/group';
 import { Empty } from '@shared/ui/empty';
-import { ContactCard, type ContactDto } from '@entities/contact';
-import { useAppDispatch, useAppSelector } from '@app/store';
-import {
-  selectFavoriteContactIds,
-  toggleFavoriteContactId,
-} from '@entities/favorites';
-import { useGetContactsQuery, useGetGroupsQuery } from '@shared/api';
+import { ContactCard } from '@entities/contact';
 
-const EMPTY_CONTACTS: ContactDto[] = [];
-const EMPTY_GROUP_CONTACTS: GroupContactsDto[] = [];
-
-export const GroupPage = (): React.JSX.Element => {
+export const GroupPage = observer((): React.JSX.Element => {
   const { groupId } = useParams<{ groupId: string }>();
-  const dispatch = useAppDispatch();
-  const contactsQuery = useGetContactsQuery();
-  const groupsQuery = useGetGroupsQuery();
-  const favoriteContactIds = useAppSelector(selectFavoriteContactIds);
-
-  const contacts = contactsQuery.data ?? EMPTY_CONTACTS;
-  const groupContactsList = groupsQuery.data ?? EMPTY_GROUP_CONTACTS;
+  const { contactsStore, favoritesStore, groupsStore } = useRootStore();
   const selectedGroupId = groupId ?? '';
-  const isDataLoading = contactsQuery.isLoading || groupsQuery.isLoading;
-  const hasDataLoadingError = contactsQuery.isError || groupsQuery.isError;
-  const groupContacts = useMemo(() => {
-    return groupContactsList.find((currentGroup) => {
-      return currentGroup.id === selectedGroupId;
-    });
-  }, [groupContactsList, selectedGroupId]);
 
-  const groupContactsMembers = useMemo(() => {
-    if (!groupContacts) {
-      return [];
+  const isDataLoading = contactsStore.isLoading || groupsStore.isLoading;
+  const hasDataLoadingError = contactsStore.hasError || groupsStore.hasError;
+  const groupContacts = groupsStore.getGroupContactsById(selectedGroupId);
+  const groupContactsMembers = groupContacts
+    ? contactsStore.contacts.filter((contact) => {
+        return groupContacts.contactIds.includes(contact.id);
+      })
+    : [];
+
+  useEffect(() => {
+    if (groupsStore.status === 'idle') {
+      void groupsStore.loadGroups();
     }
 
-    return contacts.filter((contact) => {
-      return groupContacts.contactIds.includes(contact.id);
-    });
-  }, [contacts, groupContacts]);
+    if (contactsStore.status === 'idle') {
+      void contactsStore.loadContacts();
+    }
+  }, [contactsStore, groupsStore]);
 
   const handleToggleFavorite = (contactId: string) => {
-    dispatch(toggleFavoriteContactId(contactId));
+    favoritesStore.toggleFavoriteContactId(contactId);
   };
 
   if (isDataLoading) {
@@ -80,7 +69,7 @@ export const GroupPage = (): React.JSX.Element => {
                   <ContactCard
                     contact={contact}
                     withLink
-                    isFavorite={favoriteContactIds.includes(contact.id)}
+                    isFavorite={favoritesStore.isFavorite(contact.id)}
                     onToggleFavorite={handleToggleFavorite}
                   />
                 </Col>
@@ -93,4 +82,4 @@ export const GroupPage = (): React.JSX.Element => {
       )}
     </Row>
   );
-};
+});
