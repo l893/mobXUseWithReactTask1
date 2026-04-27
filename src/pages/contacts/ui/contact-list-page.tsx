@@ -3,26 +3,18 @@ import { Col, Row } from 'react-bootstrap';
 import { observer } from 'mobx-react-lite';
 import { useRootStore } from '@app/store';
 import { ContactCard } from '@entities/contact';
-import {
-  applyContactFilters,
-  FilterForm,
-  type FilterFormValues,
-} from '@features/filters';
+import { FilterForm, type FilterFormValues } from '@features/filters';
 import { Empty } from '@shared/ui/empty';
 
 export const ContactListPage = observer((): React.JSX.Element => {
+  const rootStore = useRootStore();
   const { contactsStore, favoritesStore, filtersStore, groupsStore } =
-    useRootStore();
+    rootStore;
 
-  const contacts = contactsStore.contacts;
   const groupContactsList = groupsStore.groupContactsList;
   const isDataLoading = contactsStore.isLoading || groupsStore.isLoading;
   const hasDataLoadingError = contactsStore.hasError || groupsStore.hasError;
-  const filteredContacts = applyContactFilters({
-    contacts,
-    groupContactsList,
-    filters: filtersStore.filters,
-  });
+  const filteredContacts = rootStore.filteredContacts;
 
   useEffect(() => {
     if (contactsStore.status === 'idle') {

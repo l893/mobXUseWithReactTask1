@@ -9,17 +9,15 @@ import { ContactCard } from '@entities/contact';
 
 export const GroupPage = observer((): React.JSX.Element => {
   const { groupId } = useParams<{ groupId: string }>();
-  const { contactsStore, favoritesStore, groupsStore } = useRootStore();
+  const rootStore = useRootStore();
+  const { contactsStore, favoritesStore, groupsStore } = rootStore;
   const selectedGroupId = groupId ?? '';
 
   const isDataLoading = contactsStore.isLoading || groupsStore.isLoading;
   const hasDataLoadingError = contactsStore.hasError || groupsStore.hasError;
   const groupContacts = groupsStore.getGroupContactsById(selectedGroupId);
-  const groupContactsMembers = groupContacts
-    ? contactsStore.contacts.filter((contact) => {
-        return groupContacts.contactIds.includes(contact.id);
-      })
-    : [];
+  const groupContactsMembers =
+    rootStore.getGroupContactsMembers(selectedGroupId);
 
   useEffect(() => {
     if (groupsStore.status === 'idle') {

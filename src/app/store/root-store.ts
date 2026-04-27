@@ -1,8 +1,8 @@
 import { configure, makeAutoObservable } from 'mobx';
-import { ContactsStore } from '@entities/contact';
+import { ContactsStore, type ContactDto } from '@entities/contact';
 import { FavoritesStore } from '@entities/favorites';
-import { GroupsStore } from '@entities/group';
-import { FiltersStore } from '@features/filters';
+import { GroupsStore, type GroupContactsDto } from '@entities/group';
+import { applyContactFilters, FiltersStore } from '@features/filters';
 
 let isMobxConfigured = false;
 
@@ -19,6 +19,35 @@ export class RootStore {
     this.filtersStore = new FiltersStore();
 
     makeAutoObservable(this, {}, { autoBind: true });
+  }
+
+  get filteredContacts(): ContactDto[] {
+    return applyContactFilters({
+      contacts: this.contactsStore.contacts,
+      groupContactsList: this.groupsStore.groupContactsList,
+      filters: this.filtersStore.filters,
+    });
+  }
+
+  get favoriteContacts(): ContactDto[] {
+    return this.contactsStore.contacts.filter((contact) => {
+      return this.favoritesStore.isFavorite(contact.id);
+    });
+  }
+
+  getGroupContactsMembers(
+    groupContactsId: GroupContactsDto['id'],
+  ): ContactDto[] {
+    const groupContacts =
+      this.groupsStore.getGroupContactsById(groupContactsId);
+
+    if (!groupContacts) {
+      return [];
+    }
+
+    return this.contactsStore.contacts.filter((contact) => {
+      return groupContacts.contactIds.includes(contact.id);
+    });
   }
 }
 

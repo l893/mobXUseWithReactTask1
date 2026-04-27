@@ -6,11 +6,9 @@ import { ContactCard } from '@entities/contact';
 import { Empty } from '@shared/ui/empty';
 
 export const FavoritListPage = observer((): React.JSX.Element => {
-  const { contactsStore, favoritesStore } = useRootStore();
-
-  const favoriteContacts = contactsStore.contacts.filter((contact) => {
-    return favoritesStore.favoriteContactIdSet.has(contact.id);
-  });
+  const rootStore = useRootStore();
+  const { contactsStore, favoritesStore } = rootStore;
+  const favoriteContacts = rootStore.favoriteContacts;
 
   useEffect(() => {
     if (contactsStore.status === 'idle') {
