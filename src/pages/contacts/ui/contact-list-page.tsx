@@ -1,59 +1,49 @@
-import React, { useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { Col, Row } from 'react-bootstrap';
-import { ContactCard, type ContactDto } from '@entities/contact';
-import type { GroupContactsDto } from '@entities/group';
+import { observer } from 'mobx-react-lite';
+import { useRootStore } from '@app/store';
+import { ContactCard } from '@entities/contact';
 import {
   applyContactFilters,
   FilterForm,
   type FilterFormValues,
-  resetFilters,
-  selectFilters,
-  setFilters,
 } from '@features/filters';
-import { useAppDispatch, useAppSelector } from '@app/store';
-import {
-  selectFavoriteContactIds,
-  toggleFavoriteContactId,
-} from '@entities/favorites';
-import { useGetContactsQuery, useGetGroupsQuery } from '@shared/api';
 import { Empty } from '@shared/ui/empty';
 
-const EMPTY_CONTACTS: ContactDto[] = [];
-const EMPTY_GROUP_CONTACTS: GroupContactsDto[] = [];
+export const ContactListPage = observer((): React.JSX.Element => {
+  const { contactsStore, favoritesStore, filtersStore, groupsStore } =
+    useRootStore();
 
-export const ContactListPage = (): React.JSX.Element => {
-  const dispatch = useAppDispatch();
-  const contactsQuery = useGetContactsQuery();
-  const groupsQuery = useGetGroupsQuery();
-  const filters = useAppSelector(selectFilters);
-  const favoriteContactIds = useAppSelector(selectFavoriteContactIds);
+  const contacts = contactsStore.contacts;
+  const groupContactsList = groupsStore.groupContactsList;
+  const isDataLoading = contactsStore.isLoading || groupsStore.isLoading;
+  const hasDataLoadingError = contactsStore.hasError || groupsStore.hasError;
+  const filteredContacts = applyContactFilters({
+    contacts,
+    groupContactsList,
+    filters: filtersStore.filters,
+  });
 
-  const contacts = contactsQuery.data ?? EMPTY_CONTACTS;
-  const groupContactsList = groupsQuery.data ?? EMPTY_GROUP_CONTACTS;
-  const isDataLoading = contactsQuery.isLoading || groupsQuery.isLoading;
-  const hasDataLoadingError = contactsQuery.isError || groupsQuery.isError;
-  const filterFormInitialValues: Partial<FilterFormValues> = {
-    name: filters.nameQuery,
-    groupId: filters.groupId,
-  };
-  const filteredContacts = useMemo(() => {
-    return applyContactFilters({
-      contacts,
-      groupContactsList,
-      filters,
-    });
-  }, [contacts, groupContactsList, filters]);
+  useEffect(() => {
+    if (contactsStore.status === 'idle') {
+      void contactsStore.loadContacts();
+    }
+
+    if (groupsStore.status === 'idle') {
+      void groupsStore.loadGroups();
+    }
+  }, [contactsStore, groupsStore]);
 
   const handleFiltersSubmit = (filterValues: Partial<FilterFormValues>) => {
-    dispatch(setFilters(filterValues));
+    filtersStore.setFilters(filterValues);
   };
 
   const handleResetFilters = () => {
-    dispatch(resetFilters());
+    filtersStore.resetFilters();
   };
 
   const handleToggleFavorite = (contactId: string) => {
-    dispatch(toggleFavoriteContactId(contactId));
+    favoritesStore.toggleFavoriteContactId(contactId);
   };
 
   if (isDataLoading) {
@@ -77,7 +67,7 @@ export const ContactListPage = (): React.JSX.Element => {
       <Col className="mb-3">
         <FilterForm
           groupContactsList={groupContactsList}
-          initialValues={filterFormInitialValues}
+          initialValues={filtersStore.filterFormInitialValues}
           enableReinitialize
           onSubmit={handleFiltersSubmit}
           onResetFilters={handleResetFilters}
@@ -91,7 +81,7 @@ export const ContactListPage = (): React.JSX.Element => {
                 <ContactCard
                   contact={contact}
                   withLink
-                  isFavorite={favoriteContactIds.includes(contact.id)}
+                  isFavorite={favoritesStore.isFavorite(contact.id)}
                   onToggleFavorite={handleToggleFavorite}
                 />
               </Col>
@@ -103,4 +93,4 @@ export const ContactListPage = (): React.JSX.Element => {
       </Col>
     </Row>
   );
-};
+});
