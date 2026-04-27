@@ -1,36 +1,29 @@
-import React, { useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { Col, Row } from 'react-bootstrap';
 import { useParams } from 'react-router-dom';
-import { ContactCard, type ContactDto } from '@entities/contact';
+import { observer } from 'mobx-react-lite';
+import { useRootStore } from '@app/store';
+import { ContactCard } from '@entities/contact';
 import { Empty } from '@shared/ui/empty';
-import { useAppDispatch, useAppSelector } from '@app/store';
-import {
-  selectFavoriteContactIds,
-  toggleFavoriteContactId,
-} from '@entities/favorites';
-import { useGetContactsQuery } from '@shared/api';
 
-const EMPTY_CONTACTS: ContactDto[] = [];
-
-export const ContactPage = (): React.JSX.Element => {
+export const ContactPage = observer((): React.JSX.Element => {
   const { contactId } = useParams<{ contactId: string }>();
-  const dispatch = useAppDispatch();
-  const contactsQuery = useGetContactsQuery();
-  const favoriteContactIds = useAppSelector(selectFavoriteContactIds);
 
-  const contacts = contactsQuery.data ?? EMPTY_CONTACTS;
+  const { contactsStore, favoritesStore } = useRootStore();
   const selectedContactId = contactId ?? '';
-  const contact = useMemo(() => {
-    return contacts.find((currentContact) => {
-      return currentContact.id === selectedContactId;
-    });
-  }, [contacts, selectedContactId]);
+  const contact = contactsStore.getContactById(selectedContactId);
+
+  useEffect(() => {
+    if (contactsStore.status === 'idle') {
+      void contactsStore.loadContacts();
+    }
+  }, [contactsStore]);
 
   const handleToggleFavorite = (selectedContactId: string) => {
-    dispatch(toggleFavoriteContactId(selectedContactId));
+    favoritesStore.toggleFavoriteContactId(selectedContactId);
   };
 
-  if (contactsQuery.isLoading) {
+  if (contactsStore.isLoading) {
     return (
       <Row>
         <Col>Загрузка контакта...</Col>
@@ -38,7 +31,7 @@ export const ContactPage = (): React.JSX.Element => {
     );
   }
 
-  if (contactsQuery.isError) {
+  if (contactsStore.hasError) {
     return (
       <Row>
         <Col>Не удалось загрузить контакт.</Col>
@@ -52,7 +45,7 @@ export const ContactPage = (): React.JSX.Element => {
         {contact ? (
           <ContactCard
             contact={contact}
-            isFavorite={favoriteContactIds.includes(contact.id)}
+            isFavorite={favoritesStore.isFavorite(contact.id)}
             onToggleFavorite={handleToggleFavorite}
           />
         ) : (
@@ -61,4 +54,4 @@ export const ContactPage = (): React.JSX.Element => {
       </Col>
     </Row>
   );
-};
+});
