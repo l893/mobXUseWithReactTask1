@@ -1,33 +1,28 @@
-import React, { useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { Col, Row } from 'react-bootstrap';
-import { ContactCard, type ContactDto } from '@entities/contact';
-import { useAppDispatch, useAppSelector } from '@app/store';
-import {
-  selectFavoriteContactIds,
-  toggleFavoriteContactId,
-} from '@entities/favorites';
-import { useGetContactsQuery } from '@shared/api';
+import { observer } from 'mobx-react-lite';
+import { useRootStore } from '@app/store';
+import { ContactCard } from '@entities/contact';
 import { Empty } from '@shared/ui/empty';
 
-const EMPTY_CONTACTS: ContactDto[] = [];
+export const FavoritListPage = observer((): React.JSX.Element => {
+  const { contactsStore, favoritesStore } = useRootStore();
 
-export const FavoritListPage = (): React.JSX.Element => {
-  const dispatch = useAppDispatch();
-  const contactsQuery = useGetContactsQuery();
-  const favoriteContactIds = useAppSelector(selectFavoriteContactIds);
+  const favoriteContacts = contactsStore.contacts.filter((contact) => {
+    return favoritesStore.favoriteContactIdSet.has(contact.id);
+  });
 
-  const contacts = contactsQuery.data ?? EMPTY_CONTACTS;
-  const favoriteContacts = useMemo(() => {
-    return contacts.filter((contact) => {
-      return favoriteContactIds.includes(contact.id);
-    });
-  }, [contacts, favoriteContactIds]);
+  useEffect(() => {
+    if (contactsStore.status === 'idle') {
+      void contactsStore.loadContacts();
+    }
+  }, [contactsStore]);
 
   const handleToggleFavorite = (contactId: string) => {
-    dispatch(toggleFavoriteContactId(contactId));
+    favoritesStore.toggleFavoriteContactId(contactId);
   };
 
-  if (contactsQuery.isLoading) {
+  if (contactsStore.isLoading) {
     return (
       <Row>
         <Col>Загрузка избранных контактов...</Col>
@@ -35,7 +30,7 @@ export const FavoritListPage = (): React.JSX.Element => {
     );
   }
 
-  if (contactsQuery.isError) {
+  if (contactsStore.hasError) {
     return (
       <Row>
         <Col>Не удалось загрузить избранные контакты.</Col>
@@ -61,4 +56,4 @@ export const FavoritListPage = (): React.JSX.Element => {
       ))}
     </Row>
   );
-};
+});
