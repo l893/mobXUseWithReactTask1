@@ -1,14 +1,21 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Col, Row } from 'react-bootstrap';
+import { observer } from 'mobx-react-lite';
+import { useRootStore } from '@app/store';
 import { GroupContactsCard } from '@entities/group';
 import { Empty } from '@shared/ui/empty';
-import { useGetGroupsQuery } from '@shared/api';
 
-export const GroupListPage = (): React.JSX.Element => {
-  const groupsQuery = useGetGroupsQuery();
-  const groupContactsList = groupsQuery.data ?? [];
+export const GroupListPage = observer((): React.JSX.Element => {
+  const { groupsStore } = useRootStore();
+  const groupContactsList = groupsStore.groupContactsList;
 
-  if (groupsQuery.isLoading) {
+  useEffect(() => {
+    if (groupsStore.status === 'idle') {
+      void groupsStore.loadGroups();
+    }
+  }, [groupsStore]);
+
+  if (groupsStore.isLoading) {
     return (
       <Row>
         <Col>Загрузка групп...</Col>
@@ -16,7 +23,7 @@ export const GroupListPage = (): React.JSX.Element => {
     );
   }
 
-  if (groupsQuery.isError) {
+  if (groupsStore.hasError) {
     return (
       <Row>
         <Col>Не удалось загрузить группы.</Col>
@@ -37,4 +44,4 @@ export const GroupListPage = (): React.JSX.Element => {
       ))}
     </Row>
   );
-};
+});
