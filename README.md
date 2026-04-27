@@ -1,14 +1,13 @@
-# Contacts — React + FSD + Redux Toolkit + RTK Query + Vite
+# Contacts — React + FSD + MobX + Vite
 
 Учебное приложение “Contacts” для практики:
 
 - **React Router** (SPA навигация)
 - архитектуры **Feature-Sliced Design (FSD)**
-- **Redux Toolkit**: `configureStore`, `createSlice`
-- **RTK Query**: загрузка контактов и групп с сервера
-- **React Redux typed hooks**
-- **redux-persist** для сохранения избранного
-- middleware + Redux DevTools
+- **MobX**: observable state, actions, computed values, `flow`
+- **mobx-react-lite**: интеграция MobX с React через `observer`
+- загрузки данных через MobX stores
+- сохранения избранного в `localStorage`
 
 ---
 
@@ -25,7 +24,7 @@
 - Избранное:
   - список избранных контактов
   - добавление/удаление из избранного через ⭐/☆ на карточке контакта
-  - **persist** избранного в `localStorage` (через `redux-persist`)
+  - **persist** избранного в `localStorage` через `FavoritesStore`
 
 ---
 
@@ -34,11 +33,8 @@
 - React `18`
 - TypeScript
 - React Router DOM `6` (с `future`-флагами)
-- Redux Toolkit
-- RTK Query
-- Redux `5`
-- React Redux
-- redux-persist
+- MobX
+- mobx-react-lite
 - Vite
 - Bootstrap + React Bootstrap
 - Formik
@@ -72,7 +68,7 @@ npm test
 
 ## Данные
 
-Контакты и группы загружаются с сервера через **RTK Query**.
+Контакты и группы загружаются с сервера через MobX stores.
 
 Контакты:
 
@@ -88,80 +84,103 @@ GET https://mocki.io/v1/883e8cde-55d6-4b4a-bdbc-0db1de7989c9
 
 API layer:
 
-- `src/shared/api/contacts-api.ts`
+- `src/shared/api/contacts-client.ts`
 - `src/shared/api/contacts-api.constants.ts`
 
-Контакты и группы не копируются в обычные Redux slices. Они хранятся в RTK Query cache.
+Контакты и группы хранятся в MobX stores:
+
+- `src/entities/contact/model/contacts-store.ts`
+- `src/entities/group/model/groups-store.ts`
 
 ---
 
-## Redux architecture
+## MobX architecture
 
-Проект был мигрирован с Classic Redux на Redux Toolkit.
+Проект был мигрирован с Redux Toolkit / RTK Query на MobX.
 
-### Что заменено
+### Что заменено при миграции
 
-Classic Redux boilerplate:
-
-- `createStore`
-- `applyMiddleware`
-- ручные action types
-- ручные action creators
-- ручные reducers через `switch`
-- thunk-инициализация моковых данных
-
-заменён на:
+Redux / RTK Query слой:
 
 - `configureStore`
 - `createSlice`
+- Redux reducers
+- Redux selectors
+- React Redux Provider
+- typed hooks `useAppDispatch` / `useAppSelector`
 - RTK Query `createApi`
-- RTK Query `fetchBaseQuery`
-- auto-generated query hooks
-- typed hooks для `useDispatch` / `useSelector`
+- RTK Query generated hooks
+- `redux-persist`
+
+заменён на:
+
+- `RootStore`
+- `RootStoreProvider`
+- `useRootStore`
+- `ContactsStore`
+- `GroupsStore`
+- `FavoritesStore`
+- `FiltersStore`
+- `observer` из `mobx-react-lite`
+- MobX `flow` для асинхронных запросов
+- `localStorage` persist для избранного
 
 ### Server state
 
-Server state хранится в RTK Query cache:
+Server state хранится в MobX stores:
 
-- contacts
-- groups
+- `ContactsStore.contacts`
+- `GroupsStore.groupContactsList`
 
-Это позволяет не дублировать данные в обычном Redux state и не писать вручную loading/error/cache logic.
+Загрузка выполняется через MobX `flow`:
+
+- `contactsStore.loadContacts()`
+- `groupsStore.loadGroups()`
+
+Stores также хранят `status` и `errorMessage`, чтобы страницы могли показывать loading/error/success состояния.
 
 ### Client state
 
-Client-side состояние хранится в обычных Redux Toolkit slices:
+Client-side состояние хранится в MobX stores:
 
-- `favorites` — список id избранных контактов
-- `filters` — значения фильтрации контактов
+- `FavoritesStore.favoriteContactIds` — список id избранных контактов
+- `FiltersStore.nameQuery` — фильтр по имени
+- `FiltersStore.groupId` — фильтр по группе
 
-`favorites` сохраняется в `localStorage` через `redux-persist`.
+`FavoritesStore` сохраняет избранное в `localStorage`.
 
 ### Store
 
-- `src/app/store/store.ts` — `configureStore`, `persistStore`, middleware
-- `src/app/store/root-reducer.ts` — root reducer
-- `src/app/store/hooks.ts` — typed hooks:
-  - `useAppDispatch`
-  - `useAppSelector`
+- `src/app/store/root-store.ts` — root store и конфигурация MobX
+- `src/app/store/store-provider.tsx` — React provider для root store
+- `src/app/store/store-context.ts` — context и `useRootStore`
+- `src/entities/contact/model/contacts-store.ts` — контакты
+- `src/entities/group/model/groups-store.ts` — группы
+- `src/entities/favorites/model/favorites-store.ts` — избранное
+- `src/features/filters/model/filters-store.ts` — фильтры
 
-RTK Query reducer подключён через:
+### React integration
+
+Компоненты, которые читают observable state, обёрнуты в `observer`.
+
+Пример:
 
 ```ts
-[contactsApi.reducerPath]: contactsApi.reducer
+export const ContactListPage = observer((): React.JSX.Element => {
+  const { contactsStore, favoritesStore, filtersStore, groupsStore } =
+    useRootStore();
+
+  // render
+});
 ```
 
-RTK Query middleware подключён через:
-
-```ts
-getDefaultMiddleware().concat(contactsApi.middleware, metricsMiddleware);
-```
+`observer` подписывает компонент только на те observable values, которые были прочитаны во время render.
 
 ---
 
 ## Архитектура (FSD)
 
-- `src/app/` — инициализация приложения, store, Provider
+- `src/app/` — инициализация приложения, MobX root store, Provider
 - `src/pages/` — страницы приложения
 - `src/widgets/` — крупные UI-блоки: Layout, Menu, Breadcrumbs
 - `src/features/` — пользовательские сценарии и фичи: filters
@@ -186,7 +205,7 @@ getDefaultMiddleware().concat(contactsApi.middleware, metricsMiddleware);
 3. Перейди в `/groups` → список групп
 4. Открой группу `/groups/:groupId` → видны контакты группы
 5. Открой `/favorit` → список избранных
-6. Обнови страницу на `/favorit` → избранное должно остаться (persist)
+6. Обнови страницу на `/favorit` → избранное должно остаться в `localStorage`
 7. В DevTools заблокируй `*mocki.io*` → должен появиться error state
 
 ## Установка зависимостей
