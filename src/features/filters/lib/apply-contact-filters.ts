@@ -1,11 +1,11 @@
 import type { ContactDto } from '@entities/contact';
 import type { GroupContactsDto } from '@entities/group';
-import type { FiltersState } from '@features/filters/model/filters';
+import type { ContactFilters } from '@features/filters';
 
 interface ApplyContactFiltersParams {
   contacts: ContactDto[];
   groupContactsList: GroupContactsDto[];
-  filters: FiltersState;
+  filters: ContactFilters;
 }
 
 export function applyContactFilters({
